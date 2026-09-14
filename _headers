@@ -1,0 +1,18 @@
+# Security headers per Cloudflare Pages (lancio vero). Su GitHub Pages (anteprima) questo file e' ignorato.
+# Sito statico: font in locale, nessun embed, nessun analytics. I link esterni (RispondiTu, WhatsApp, Maps, social)
+# sono semplici <a>, non servono in CSP.
+
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'sha256-REPLACE_AT_LAUNCH'; connect-src 'self'; form-action 'self'; frame-src 'none'; upgrade-insecure-requests
+
+/assets/*
+  Cache-Control: public, max-age=604800
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://chripav09-del.github.io/NicholasBarbiere/sitemap.xml
