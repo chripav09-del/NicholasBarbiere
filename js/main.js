@@ -4,7 +4,6 @@
   window.NB_IN = true;
   var root = document.documentElement;
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var WA = "https://wa.me/393890097426?text=";
   var $$ = function (s, c) { return [].slice.call((c || document).querySelectorAll(s)); };
 
   /* ---------- entrate ---------- */
@@ -12,11 +11,11 @@
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) {
         if (!e.isIntersecting) return;
-        var el = e.target;
-        var sib = $$("[data-in]", el.parentNode).filter(function (c) { return c.parentNode === el.parentNode; });
-        el.style.transitionDelay = Math.min(Math.max(0, sib.indexOf(el)) * 40, 160) + "ms";
-        el.classList.add("is-in");
-        io.unobserve(el);
+        // blocchi fratelli entrano uno dopo l'altro
+        var sib = [].filter.call(e.target.parentNode.children, function (c) { return c.hasAttribute("data-in"); });
+        e.target.style.transitionDelay = Math.min(Math.max(0, sib.indexOf(e.target)) * 60, 240) + "ms";
+        e.target.classList.add("is-in");
+        io.unobserve(e.target);
       });
     }, { rootMargin: "0px 0px -6% 0px", threshold: 0.06 });
     $$("[data-in]").forEach(function (el) { io.observe(el); });
@@ -27,18 +26,18 @@
   /* ---------- aperto / chiuso (ora di Roma) ---------- */
   // dalla sua pagina di prenotazione: mar-ven 08:00-12:30 e 15:00-19:30, sab 08:00-14:00
   var ORARI = { 2: [[480, 750], [900, 1170]], 3: [[480, 750], [900, 1170]], 4: [[480, 750], [900, 1170]], 5: [[480, 750], [900, 1170]], 6: [[480, 840]] };
-  var GIORNI = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
-  function hhmm(m) { return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); }
+  var GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+  function hhmm(m) { return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); }
   function romeNow() {
     try { return new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" })); } catch (e) { return new Date(); }
   }
   function stato() {
     var now = romeNow(), d = now.getDay(), m = now.getHours() * 60 + now.getMinutes(), oggi = ORARI[d] || [];
-    for (var i = 0; i < oggi.length; i++) if (m >= oggi[i][0] && m < oggi[i][1]) return { open: true, day: d, text: "Aperto · fino alle " + hhmm(oggi[i][1]) };
-    for (var k = 0; k < oggi.length; k++) if (m < oggi[k][0]) return { open: false, day: d, text: "Chiuso · riapre " + hhmm(oggi[k][0]) };
+    for (var i = 0; i < oggi.length; i++) if (m >= oggi[i][0] && m < oggi[i][1]) return { open: true, day: d, text: "Aperto, chiude alle " + hhmm(oggi[i][1]) };
+    for (var k = 0; k < oggi.length; k++) if (m < oggi[k][0]) return { open: false, day: d, text: "Chiuso, riapre alle " + hhmm(oggi[k][0]) };
     for (var j = 1; j <= 7; j++) {
       var nd = (d + j) % 7;
-      if (ORARI[nd]) return { open: false, day: d, text: "Chiuso · " + (j === 1 ? "domani" : GIORNI[nd]) + " " + hhmm(ORARI[nd][0][0]) };
+      if (ORARI[nd]) return { open: false, day: d, text: "Chiuso, apre " + (j === 1 ? "domani" : GIORNI[nd]) + " alle " + hhmm(ORARI[nd][0][0]) };
     }
     return { open: false, day: d, text: "Chiuso" };
   }
@@ -49,10 +48,7 @@
       var t = el.querySelector("[data-status-text]");
       if (t) t.textContent = s.text;
     });
-    $$(".hours [data-day]").forEach(function (li) {
-      var d = Number(li.getAttribute("data-day"));
-      li.classList.toggle("today", d === s.day || (d === 0 && s.day === 1));
-    });
+    $$(".hours [data-day]").forEach(function (li) { li.classList.toggle("today", Number(li.getAttribute("data-day")) === s.day); });
   }
   aggiornaStato();
   setInterval(aggiornaStato, 60000);
@@ -60,20 +56,15 @@
   /* ---------- ventaglio dei reel ---------- */
   var stage = document.querySelector(".stage"), fan = stage && stage.querySelector(".fan");
   if (fan) {
-    var reels = $$(".reel", fan), order = [0, 1, 2]; // indici in posizione l, c, r
-    var POS = ["l", "c", "r"];
+    var reels = $$(".reel", fan), order = [0, 1, 2], POS = ["l", "c", "r"];
     var paint = function () { order.forEach(function (idx, p) { reels[idx].setAttribute("data-pos", POS[p]); }); };
-    var turn = function (dir) { // dir 1 = porta avanti quello a destra
-      if (dir > 0) order.push(order.shift()); else order.unshift(order.pop());
-      paint();
-    };
+    var turn = function (dir) { if (dir > 0) order.push(order.shift()); else order.unshift(order.pop()); paint(); };
     reels.forEach(function (r) {
       r.addEventListener("click", function () {
         var p = r.getAttribute("data-pos");
         if (p === "r") turn(1); else if (p === "l") turn(-1);
       });
     });
-    // trascina di lato per girare
     var x0 = null;
     stage.addEventListener("pointerdown", function (e) { x0 = e.clientX; }, { passive: true });
     stage.addEventListener("pointerup", function (e) {
@@ -81,7 +72,6 @@
       var dx = e.clientX - x0; x0 = null;
       if (Math.abs(dx) > 40) turn(dx < 0 ? 1 : -1);
     }, { passive: true });
-    // inclinazione 3D col puntatore (solo dove c'è il mouse)
     if (!reduce && window.matchMedia("(hover: hover)").matches) {
       var raf = 0;
       stage.addEventListener("pointermove", function (e) {
@@ -89,96 +79,24 @@
         raf = requestAnimationFrame(function () {
           raf = 0;
           var b = stage.getBoundingClientRect();
-          var px = (e.clientX - b.left) / b.width - 0.5, py = (e.clientY - b.top) / b.height - 0.5;
-          fan.style.setProperty("--ry", (px * 10).toFixed(2) + "deg");
-          fan.style.setProperty("--rx", (-py * 8).toFixed(2) + "deg");
+          fan.style.setProperty("--ry", (((e.clientX - b.left) / b.width - 0.5) * 10).toFixed(2) + "deg");
+          fan.style.setProperty("--rx", ((0.5 - (e.clientY - b.top) / b.height) * 8).toFixed(2) + "deg");
         });
       });
       stage.addEventListener("pointerleave", function () { fan.style.setProperty("--ry", "0deg"); fan.style.setProperty("--rx", "0deg"); });
     }
-    // entrata: le carte partono impilate al centro e si aprono (sempre visibili, anche se i timer tardano)
-    if (!reduce) {
-      reels.forEach(function (r) { r.setAttribute("data-pos", "c"); });
-      reels[1].style.zIndex = "4";
-      setTimeout(function () { reels[1].style.zIndex = ""; paint(); }, 220);
-    }
-  }
-
-  /* ---------- telefono: i tre passi della prenotazione ---------- */
-  var track = document.querySelector("[data-ph-track]");
-  if (track) {
-    var steps = $$(".step[data-step]"), bar = document.querySelector("[data-ph-bar]"), label = document.querySelector("[data-ph-step]");
-    var NOMI = ["Passo 1 · Servizio", "Passo 2 · Operatore", "Passo 3 · Giorno"], cur = 0, timer = null, visible = false;
-    var go = function (n) {
-      cur = (n + 3) % 3;
-      track.style.transform = "translateX(" + (-100 * cur) + "%)";
-      bar.style.width = ((cur + 1) * 33.34) + "%";
-      label.textContent = NOMI[cur];
-      steps.forEach(function (s, i) { s.classList.toggle("is-on", i === cur); s.setAttribute("aria-selected", i === cur ? "true" : "false"); });
-    };
-    var play = function () { stop(); if (!reduce && visible) timer = setInterval(function () { go(cur + 1); }, 2800); };
-    var stop = function () { if (timer) clearInterval(timer); timer = null; };
-    steps.forEach(function (s) { s.addEventListener("click", function () { go(Number(s.getAttribute("data-step"))); play(); }); });
-    if ("IntersectionObserver" in window) {
-      new IntersectionObserver(function (e) { visible = e[0].isIntersecting; visible ? play() : stop(); }, { threshold: 0.3 }).observe(track.closest(".phone"));
-    }
-    go(0);
-  }
-
-  /* ---------- foglio «con chi ti siedi» ---------- */
-  var sheet = document.getElementById("sheet"), lastFocus = null;
-  function openSheet(e) {
-    if (!sheet) return;
-    if (e) e.preventDefault();
-    lastFocus = document.activeElement;
-    sheet.classList.remove("is-closing");
-    sheet.style.transform = "";
-    if (typeof sheet.showModal === "function") sheet.showModal(); else sheet.setAttribute("open", "");
-  }
-  function closeSheet() {
-    if (!sheet || !sheet.open) return;
-    var finish = function () {
-      sheet.classList.remove("is-closing");
-      sheet.style.transform = "";
-      if (typeof sheet.close === "function") sheet.close(); else sheet.removeAttribute("open");
-      if (lastFocus && lastFocus.focus) lastFocus.focus();
-    };
-    if (reduce) { finish(); return; }
-    sheet.classList.add("is-closing");
-    setTimeout(finish, 180);
-  }
-  $$("[data-sheet]").forEach(function (b) { b.addEventListener("click", openSheet); });
-  if (sheet) {
-    sheet.addEventListener("cancel", function (e) { e.preventDefault(); closeSheet(); });
-    sheet.addEventListener("click", function (e) { if (e.target === sheet) closeSheet(); });
-    $$("[data-close]", sheet).forEach(function (b) { b.addEventListener("click", closeSheet); });
-    var grip = sheet.querySelector(".sheet-grip"), y0 = null, dy = 0;
-    if (grip) {
-      grip.addEventListener("pointerdown", function (e) { y0 = e.clientY; dy = 0; grip.setPointerCapture(e.pointerId); sheet.style.transition = "none"; });
-      grip.addEventListener("pointermove", function (e) {
-        if (y0 === null) return;
-        dy = e.clientY - y0;
-        sheet.style.transform = "translateY(" + (dy > 0 ? dy : dy / 6) + "px)";
-      });
-      var end = function () {
-        if (y0 === null) return;
-        y0 = null;
-        sheet.style.transition = "transform 200ms cubic-bezier(0.23, 1, 0.32, 1)";
-        if (dy > 90) closeSheet(); else sheet.style.transform = "";
-        setTimeout(function () { sheet.style.transition = ""; }, 220);
-      };
-      grip.addEventListener("pointerup", end);
-      grip.addEventListener("pointercancel", end);
-      grip.addEventListener("click", function () { if (Math.abs(dy) < 4) closeSheet(); });
-    }
+    // l'entrata è in CSS (.fan.intro); si toglie prima del primo giro, così non si ripete
+    var endIntro = function () { fan.classList.remove("intro"); };
+    setTimeout(endIntro, 900);
+    stage.addEventListener("pointerdown", endIntro, { once: true, passive: true });
   }
 
   /* ---------- consigliere di sfumatura ---------- */
   var adv = document.getElementById("consigliere");
   if (adv) {
     var ALT = {
-      bassa: { y: 226, nome: "bassa", tip: "La più discreta: sfuma solo sopra il collo e attorno alle orecchie. Si nota poco e cresce senza stacchi." },
-      media: { y: 190, nome: "media", tip: "La via di mezzo: la sfumatura sale fino a metà testa. Pulita, si vede senza essere drastica." },
+      bassa: { y: 226, nome: "bassa", tip: "La più discreta: sfuma solo sopra il collo e attorno alle orecchie." },
+      media: { y: 190, nome: "media", tip: "La via di mezzo: la sfumatura sale fino a metà testa." },
       alta:  { y: 152, nome: "alta",  tip: "La più decisa: sfuma fin quasi in cima e fa risaltare la parte sopra." }
     };
     var RIA = {
@@ -192,7 +110,7 @@
     var el = {
       top: adv.querySelector("#fm-top"), grad: adv.querySelector("#fm-grad"), low: adv.querySelector("#fm-low"),
       stop: adv.querySelector("#fg-end"), line: adv.querySelector("#fade-line"), mm: adv.querySelector("#fig-mm"),
-      say: adv.querySelector("[data-say]"), tip: adv.querySelector("[data-tip]"), wa: adv.querySelector("[data-wa]"), box: adv.querySelector(".advice")
+      say: adv.querySelector("[data-say]"), tip: adv.querySelector("[data-tip]"), box: adv.querySelector(".advice")
     };
     var now = { y: ALT.media.y, d: RIA["1"].d }, anim = null;
     var draw = function (v) {
@@ -223,7 +141,6 @@
         el.say.textContent = "«Sfumatura " + a.nome + ", " + sotto + ".»";
         el.tip.textContent = a.tip + " " + r.tip;
         el.mm.textContent = r.label === "0" ? "sotto: a zero" : "sotto: " + r.label + " · " + r.mm;
-        el.wa.href = WA + encodeURIComponent("Ciao Nicholas, vorrei prenotare un taglio sfumato: sfumatura " + a.nome + ", " + sotto + ". Quando avete posto?");
       };
       if (animate && !reduce) {
         el.box.classList.add("is-swap");
@@ -235,41 +152,56 @@
     update(false);
   }
 
-  /* ---------- caroselli: indicatore ---------- */
-  $$(".rail[data-dots]").forEach(function (rail) {
-    var dots = document.getElementById(rail.getAttribute("data-dots"));
-    if (!dots) return;
-    var n = rail.children.length, html = "", ticking = false;
-    for (var i = 0; i < n; i++) html += "<i></i>";
-    dots.innerHTML = html;
-    var mark = function () {
-      ticking = false;
-      var first = rail.children[0], w = first ? first.getBoundingClientRect().width + 12 : 1;
-      var idx = Math.round(rail.scrollLeft / w);
-      if (rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4) idx = n - 1;
-      [].forEach.call(dots.children, function (d, k) { d.classList.toggle("on", k === idx); });
-    };
-    rail.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(mark); } }, { passive: true });
-    mark();
+  /* ---------- striscia dei lavori: si ferma col dito ---------- */
+  $$("[data-strip]").forEach(function (strip) {
+    strip.addEventListener("click", function () { strip.classList.toggle("is-paused"); });
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (e) { strip.style.setProperty("--run", e[0].isIntersecting ? "running" : "paused"); }).observe(strip);
+    }
   });
+
+  /* ---------- recensioni: una alla volta ---------- */
+  var box = document.querySelector("[data-quotes]");
+  if (box) {
+    var qs = $$(".q", box), count = box.querySelector("[data-count]"), barI = box.querySelector("[data-qbar]");
+    var cur = 0, timer = null, visible = false, touched = false;
+    var show = function (n) {
+      qs[cur].classList.remove("is-on");
+      cur = (n + qs.length) % qs.length;
+      qs[cur].classList.add("is-on");
+      count.textContent = (cur + 1) + " / " + qs.length;
+    };
+    var restartBar = function () {
+      if (!barI) return;
+      barI.classList.remove("run"); void barI.offsetWidth;
+      if (!reduce && !touched && visible) barI.classList.add("run");
+    };
+    var play = function () {
+      clearInterval(timer); timer = null;
+      if (reduce || touched || !visible) { restartBar(); return; }
+      timer = setInterval(function () { show(cur + 1); restartBar(); }, 7000);
+      restartBar();
+    };
+    box.querySelector("[data-prev]").addEventListener("click", function () { touched = true; show(cur - 1); play(); });
+    box.querySelector("[data-next]").addEventListener("click", function () { touched = true; show(cur + 1); play(); });
+    var sx = null;
+    box.addEventListener("pointerdown", function (e) { sx = e.clientX; }, { passive: true });
+    box.addEventListener("pointerup", function (e) {
+      if (sx === null) return;
+      var dx = e.clientX - sx; sx = null;
+      if (Math.abs(dx) > 50) { touched = true; show(cur + (dx < 0 ? 1 : -1)); play(); }
+    }, { passive: true });
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (e) { visible = e[0].isIntersecting; play(); }, { threshold: 0.4 }).observe(box);
+    }
+  }
 
   /* ---------- barra in basso ---------- */
   var barEl = document.querySelector(".bar"), heroCta = document.querySelector(".hero-cta");
   if (barEl) {
     if (heroCta && "IntersectionObserver" in window) {
-      new IntersectionObserver(function (e) { barEl.classList.toggle("is-on", !e[0].isIntersecting); }).observe(heroCta);
+      new IntersectionObserver(function (e) { barEl.classList.toggle("is-on", !e[0].isIntersecting && e[0].boundingClientRect.top < 0); }).observe(heroCta);
     } else { barEl.classList.add("is-on"); }
-  }
-  var scale = document.querySelector(".bar-scale");
-  if (scale) {
-    var tk = false;
-    var fill = function () {
-      tk = false;
-      var h = root.scrollHeight - window.innerHeight;
-      scale.style.setProperty("--p", h > 0 ? Math.min(1, window.scrollY / h).toFixed(3) : "0");
-    };
-    window.addEventListener("scroll", function () { if (!tk) { tk = true; requestAnimationFrame(fill); } }, { passive: true });
-    fill();
   }
 
   var y = document.querySelector("[data-year]");
